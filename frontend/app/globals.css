@@ -1,0 +1,229 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ── NEXUS Design Tokens ─────────────────────────────────────────────────── */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans), 'Inter', system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), 'JetBrains Mono', 'Fira Code', monospace;
+  --font-heading: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+
+  /* NEXUS-specific colors */
+  --color-nexus-cyan: oklch(0.78 0.15 195);
+  --color-nexus-cyan-dim: oklch(0.55 0.12 195);
+  --color-nexus-green: oklch(0.72 0.19 145);
+  --color-nexus-amber: oklch(0.78 0.17 70);
+  --color-nexus-red: oklch(0.65 0.22 25);
+  --color-nexus-surface: oklch(0.14 0.005 250);
+  --color-nexus-surface-2: oklch(0.17 0.007 250);
+  --color-nexus-surface-3: oklch(0.20 0.007 250);
+  --color-nexus-border: oklch(0.28 0.01 250);
+  --color-nexus-border-dim: oklch(0.22 0.008 250);
+}
+
+/* ── Force dark mode globally ────────────────────────────────────────────── */
+:root {
+  color-scheme: dark;
+  --background: oklch(0.12 0.006 250);
+  --foreground: oklch(0.92 0.01 240);
+  --card: oklch(0.15 0.007 250);
+  --card-foreground: oklch(0.92 0.01 240);
+  --popover: oklch(0.16 0.007 250);
+  --popover-foreground: oklch(0.92 0.01 240);
+  --primary: oklch(0.78 0.15 195);
+  --primary-foreground: oklch(0.12 0.006 250);
+  --secondary: oklch(0.20 0.007 250);
+  --secondary-foreground: oklch(0.85 0.01 240);
+  --muted: oklch(0.18 0.007 250);
+  --muted-foreground: oklch(0.58 0.01 240);
+  --accent: oklch(0.20 0.007 250);
+  --accent-foreground: oklch(0.92 0.01 240);
+  --destructive: oklch(0.65 0.22 25);
+  --border: oklch(0.26 0.01 250);
+  --input: oklch(0.20 0.008 250);
+  --ring: oklch(0.78 0.15 195);
+  --radius: 0.5rem;
+  --sidebar: oklch(0.13 0.007 250);
+  --sidebar-foreground: oklch(0.85 0.01 240);
+  --sidebar-primary: oklch(0.78 0.15 195);
+  --sidebar-primary-foreground: oklch(0.12 0.006 250);
+  --sidebar-accent: oklch(0.18 0.007 250);
+  --sidebar-accent-foreground: oklch(0.92 0.01 240);
+  --sidebar-border: oklch(0.22 0.009 250);
+  --sidebar-ring: oklch(0.78 0.15 195);
+}
+
+/* ── Base reset ──────────────────────────────────────────────────────────── */
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "ss01", "ss02", "cv01";
+  }
+  html {
+    @apply font-sans;
+  }
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: oklch(0.14 0.005 250);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: oklch(0.28 0.01 250);
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.38 0.01 250);
+  }
+}
+
+/* ── NEXUS Animations ────────────────────────────────────────────────────── */
+@keyframes slide-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 4px oklch(0.78 0.15 195 / 0.3); }
+  50% { box-shadow: 0 0 12px oklch(0.78 0.15 195 / 0.6); }
+}
+
+@keyframes scan-line {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+@layer utilities {
+  .animate-slide-in-up {
+    animation: slide-in-up 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+  .animate-fade-in {
+    animation: fade-in 0.3s ease forwards;
+  }
+  .animate-pulse-glow {
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+  .animate-blink {
+    animation: blink 1s step-end infinite;
+  }
+
+  /* Monospace utility for log/command output */
+  .font-mono-ops {
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    letter-spacing: -0.01em;
+    line-height: 1.6;
+  }
+
+  /* Scan line effect on cards */
+  .card-scan::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      oklch(0.78 0.15 195 / 0.04) 50%,
+      transparent 100%
+    );
+    animation: scan-line 3s linear infinite;
+    pointer-events: none;
+    border-radius: inherit;
+    overflow: hidden;
+  }
+
+  /* Nexus-specific surface colors */
+  .bg-nexus-surface   { background-color: oklch(0.15 0.007 250); }
+  .bg-nexus-surface-2 { background-color: oklch(0.18 0.007 250); }
+  .bg-nexus-surface-3 { background-color: oklch(0.21 0.007 250); }
+  .border-nexus       { border-color: oklch(0.26 0.01 250); }
+  .border-nexus-dim   { border-color: oklch(0.20 0.008 250); }
+  .text-nexus-cyan    { color: oklch(0.78 0.15 195); }
+  .text-nexus-green   { color: oklch(0.72 0.19 145); }
+  .text-nexus-amber   { color: oklch(0.78 0.17 70); }
+  .text-nexus-red     { color: oklch(0.65 0.22 25); }
+  .text-nexus-dim     { color: oklch(0.55 0.008 240); }
+
+  /* Status bar */
+  .stat-bar-track {
+    height: 4px;
+    background: oklch(0.22 0.008 250);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .stat-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.8s ease;
+  }
+
+  /* Stage connector line */
+  .stage-connector {
+    width: 2px;
+    background: linear-gradient(to bottom, oklch(0.78 0.15 195 / 0.4), transparent);
+    margin-left: 11px;
+  }
+
+  /* Terminal prompt glow */
+  .input-nexus {
+    caret-color: oklch(0.78 0.15 195);
+  }
+  .input-nexus:focus {
+    box-shadow: 0 0 0 1px oklch(0.78 0.15 195 / 0.5), inset 0 1px 3px oklch(0 0 0 / 0.4);
+  }
+}

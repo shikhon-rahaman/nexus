@@ -1,0 +1,42 @@
+# =============================================================================
+# docker-compose.yml — NEXUS Demo Sandbox
+# Place: nexus/ root directory
+# Usage: docker compose up -d   (from nexus/ directory)
+# =============================================================================
+
+services:
+  sandbox:
+    build:
+      context: ./sandbox
+      dockerfile: Dockerfile
+    container_name: nexus-sandbox
+    # Memory limit gives the worker room to grow to ~1.5 GB before OOM.
+    # 2 GB limit means the container stays alive well past the 1.5 GB cap
+    # in worker.py, so the demo doesn't accidentally OOM-kill the container.
+    # Adjust to 1.8g if your host is memory-constrained (will OOM kill worker
+    # at ~1.5 GB as a more dramatic escalation scenario).
+    mem_limit: 2g
+    memswap_limit: 2g   # disable swap to make OOM kills deterministic
+    ports:
+      # nginx on container port 80 → host port 8080
+      # Change the host port if 8080 is occupied on your machine
+      - "8080:80"
+    restart: unless-stopped
+    # Give supervisord time to bring up nginx before healthcheck fires
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:80/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    # Named volume for nginx logs — survives container restarts during reset
+    # cycles so log history is preserved for post-demo review
+    volumes:
+      - nginx_logs:/var/log/nginx
+      - supervisor_logs:/var/log/supervisor
+
+volumes:
+  nginx_logs:
+    driver: local
+  supervisor_logs:
+    driver: local
