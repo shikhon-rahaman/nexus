@@ -12,25 +12,53 @@ This file has zero LLM involvement. It should be unit-testable against
 a real container without touching app/orchestrator.py at all.
 """
 from __future__ import annotations
+import os
 import subprocess
 import re
 from app.schemas import Evidence
 
 TIMEOUT = 8
+SANDBOX_CONTAINER = os.getenv("NEXUS_SANDBOX_CONTAINER", "nexus-sandbox")
+_CONTAINER_UNREACHABLE_MARKERS = (
+    "cannot connect to the docker daemon",
+    "error during connect",
+    "no such container",
+    "is not running",
+    "docker desktop is not running",
+)
+_SUPERVISOR_PROGRAMS = {"python-worker": "worker"}
+_SUPERVISOR_LOG_FILES = {
+    "nginx": (
+        "/var/log/supervisor/nginx.stdout.log",
+        "/var/log/supervisor/nginx.stderr.log",
+    ),
+    "python-worker": (
+        "/var/log/supervisor/worker.stdout.log",
+        "/var/log/supervisor/worker.stderr.log",
+    ),
+}
 
 
 def _run(cmd: list[str]) -> str:
     """Run an allowlisted command with a fixed argv list — never shell=True,
     so there is no shell metacharacter interpretation possible."""
+    docker_cmd = ["docker", "exec", SANDBOX_CONTAINER] + cmd
     try:
         result = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=TIMEOUT, shell=False
+            docker_cmd, capture_output=True, text=True, timeout=TIMEOUT, shell=False
         )
-        return (result.stdout or result.stderr or "").strip()[:8000]
+        output = (result.stdout or result.stderr or "").strip()[:8000]
+        if result.returncode and any(
+            marker in output.lower() for marker in _CONTAINER_UNREACHABLE_MARKERS
+        ):
+            return f"__CONTAINER_UNREACHABLE__: {output}"[:8000]
+        return output
     except subprocess.TimeoutExpired:
         return "__TIMEOUT__"
     except FileNotFoundError:
-        return "__TOOL_NOT_FOUND__"
+        return "__CONTAINER_UNREACHABLE__: Docker CLI not found."
+    except OSError as exc:
+        return f"__CONTAINER_UNREACHABLE__: {exc}"
 
 
 def get_memory() -> Evidence:
@@ -83,15 +111,20 @@ def list_processes(top_n: int = 5) -> Evidence:
 
 
 def service_status(service_name: str) -> Evidence:
-    raw = _run(["systemctl", "status", service_name, "--no-pager"])
-    active = "active (running)" in raw
+    program_name = _SUPERVISOR_PROGRAMS.get(service_name, service_name)
+    raw = _run(["supervisorctl", "status", program_name])
+    active = bool(re.search(rf"^{re.escape(program_name)}\s+RUNNING\b", raw, re.MULTILINE))
     return Evidence(tool_name="service_status", raw_output=raw,
                      parsed_metrics={"service": service_name, "active": active},
                      trust_level="system_verified")
 
 
 def read_logs(unit: str, lines: int = 50) -> Evidence:
-    raw = _run(["journalctl", "-u", unit, "-n", str(lines), "--no-pager"])
+    log_files = _SUPERVISOR_LOG_FILES.get(unit)
+    if log_files is None:
+        raw = f"__SUPERVISOR_LOG_NOT_CONFIGURED__: {unit}"
+    else:
+        raw = _run(["tail", "-n", str(lines), *log_files])
     raw = _redact_secrets(raw)
     return Evidence(tool_name="read_logs", raw_output=raw, parsed_metrics={"unit": unit, "line_count": lines},
                      trust_level="log_derived")
