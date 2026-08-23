@@ -61,7 +61,7 @@ def _run(cmd: list[str]) -> str:
         return f"__CONTAINER_UNREACHABLE__: {exc}"
 
 
-def get_memory() -> Evidence:
+def get_memory(**_ignored) -> Evidence:
     raw = _run(["free", "-m"])
     metrics = {}
     for line in raw.splitlines():
@@ -79,7 +79,7 @@ def get_memory() -> Evidence:
     return Evidence(tool_name="get_memory", raw_output=raw, parsed_metrics=metrics, trust_level="system_verified")
 
 
-def get_cpu() -> Evidence:
+def get_cpu(**_ignored) -> Evidence:
     raw = _run(["uptime"])
     load = None
     m = re.search(r"load average:\s*([\d.]+)", raw)
@@ -88,7 +88,7 @@ def get_cpu() -> Evidence:
     return Evidence(tool_name="get_cpu", raw_output=raw, parsed_metrics={"load_1min": load}, trust_level="system_verified")
 
 
-def get_disk() -> Evidence:
+def get_disk(**_ignored) -> Evidence:
     raw = _run(["df", "-h", "/"])
     metrics = {}
     lines = raw.splitlines()
@@ -99,7 +99,7 @@ def get_disk() -> Evidence:
     return Evidence(tool_name="get_disk", raw_output=raw, parsed_metrics=metrics, trust_level="system_verified")
 
 
-def list_processes(top_n: int = 5) -> Evidence:
+def list_processes(top_n: int = 5, **_ignored) -> Evidence:
     raw = _run(["ps", "aux", "--sort=-%mem"])
     lines = raw.splitlines()[1:top_n + 1]
     procs = []
@@ -110,7 +110,7 @@ def list_processes(top_n: int = 5) -> Evidence:
     return Evidence(tool_name="list_processes", raw_output=raw, parsed_metrics={"top_processes": procs}, trust_level="system_verified")
 
 
-def service_status(service_name: str) -> Evidence:
+def service_status(service_name: str, **_ignored) -> Evidence:
     program_name = _SUPERVISOR_PROGRAMS.get(service_name, service_name)
     raw = _run(["supervisorctl", "status", program_name])
     active = bool(re.search(rf"^{re.escape(program_name)}\s+RUNNING\b", raw, re.MULTILINE))
@@ -119,7 +119,7 @@ def service_status(service_name: str) -> Evidence:
                      trust_level="system_verified")
 
 
-def read_logs(unit: str, lines: int = 50) -> Evidence:
+def read_logs(unit: str, lines: int = 50, **_ignored) -> Evidence:
     log_files = _SUPERVISOR_LOG_FILES.get(unit)
     if log_files is None:
         raw = f"__SUPERVISOR_LOG_NOT_CONFIGURED__: {unit}"
@@ -130,18 +130,18 @@ def read_logs(unit: str, lines: int = 50) -> Evidence:
                      trust_level="log_derived")
 
 
-def list_ports() -> Evidence:
+def list_ports(**_ignored) -> Evidence:
     raw = _run(["ss", "-tulwn"])
     return Evidence(tool_name="list_ports", raw_output=raw, parsed_metrics={}, trust_level="system_verified")
 
 
-def restart_service(service_name: str) -> Evidence:
+def restart_service(service_name: str, **_ignored) -> Evidence:
     raw = _run(["systemctl", "restart", service_name])
     return Evidence(tool_name="restart_service", raw_output=raw or "OK",
                      parsed_metrics={"service": service_name}, trust_level="system_verified")
 
 
-def kill_process(pid: int) -> Evidence:
+def kill_process(pid: int, **_ignored) -> Evidence:
     raw = _run(["kill", "-15", str(pid)])
     return Evidence(tool_name="kill_process", raw_output=raw or "OK",
                      parsed_metrics={"pid": pid}, trust_level="system_verified")
