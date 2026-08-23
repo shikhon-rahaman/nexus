@@ -3,8 +3,8 @@
 worker.py — NEXUS Demo Sandbox: Memory-Pressure Simulator
 ==========================================================
 Normal behaviour  : idle loop, ~5 MB RSS, logs heartbeat every 30 s.
-Fault behaviour   : on SIGUSR1, allocates ~1 MB/tick, logging RSS each
-                    second, up to a 1.5 GB cap.
+Fault behaviour   : on SIGUSR1, allocates ~20 MiB/tick, logging RSS each
+                    second, up to a 700 MiB cap.
 
 Design decisions
 ----------------
@@ -12,11 +12,11 @@ Design decisions
   window where a signal could arrive unhandled.
 * Allocation happens in the main thread (via a flag set by the handler) so
   we never fight Python's GIL from a signal context.
-* 1 MB chunk size means we overshoot the cap by at most ~1 MB, not 50 MB.
-* The 1.5 GB cap prevents an OOM kill from happening too quickly — judges
-  need time to watch the AI diagnose the fault. An OOM kill (exit 137) is
-  still possible if the container's memory limit is lower; that is expected
-  escalation behaviour and is documented.
+* 20 MiB chunk size reaches the diagnosis threshold quickly while limiting
+  cap overshoot to at most ~20 MiB.
+* The 700 MiB cap crosses the container's RAM diagnosis threshold while
+  leaving headroom for nginx and supervisord, so judges can observe the
+  fault without an immediate OOM kill.
 * A clear STARTUP banner makes restarts visible in aggregated logs.
 """
 
@@ -27,10 +27,10 @@ import time
 import psutil
 
 # ── Configuration ────────────────────────────────────────────────────────────
-ALLOC_CHUNK_BYTES  = 1 * 1024 * 1024   # 1 MB per tick
+ALLOC_CHUNK_BYTES  = 20 * 1024 * 1024  # 20 MiB per tick
 TICK_INTERVAL_SEC  = 1.0               # sleep between ticks during fault
 HEARTBEAT_INTERVAL = 30                # seconds between idle heartbeats
-MAX_RSS_BYTES      = 1.5 * 1024 ** 3   # 1.5 GB hard cap
+MAX_RSS_BYTES      = 700 * 1024 ** 2   # 700 MiB hard cap
 
 # ── State ────────────────────────────────────────────────────────────────────
 _fault_active = False   # set True by SIGUSR1 handler; never reset automatically
@@ -94,7 +94,7 @@ def main():
             current_rss = psutil.Process(os.getpid()).memory_info().rss
             if current_rss >= MAX_RSS_BYTES:
                 _log(
-                    f"RSS={current_rss / (1024**2):.1f} MB — CAP REACHED (1.5 GB) "
+                    f"RSS={current_rss / (1024**2):.1f} MB — CAP REACHED (700 MiB) "
                     f"holding allocation, no more growth"
                 )
                 # Keep sleeping; we don't exit — the AI should detect and fix
@@ -104,7 +104,7 @@ def main():
                 chunk = bytearray(ALLOC_CHUNK_BYTES)
                 _allocations.append(chunk)
                 rss_mb = current_rss / (1024 ** 2)
-                _log(f"[FAULT] RSS={rss_mb:.1f} MB  allocating +1 MB/s ...")
+                _log(f"[FAULT] RSS={rss_mb:.1f} MB  allocating +20 MiB/s ...")
                 time.sleep(TICK_INTERVAL_SEC)
         else:
             # ── Idle mode: heartbeat every HEARTBEAT_INTERVAL seconds ────────

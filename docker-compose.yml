@@ -10,13 +10,10 @@ services:
       context: ./sandbox
       dockerfile: Dockerfile
     container_name: nexus-sandbox
-    # Memory limit gives the worker room to grow to ~1.5 GB before OOM.
-    # 2 GB limit means the container stays alive well past the 1.5 GB cap
-    # in worker.py, so the demo doesn't accidentally OOM-kill the container.
-    # Adjust to 1.8g if your host is memory-constrained (will OOM kill worker
-    # at ~1.5 GB as a more dramatic escalation scenario).
-    mem_limit: 2g
-    memswap_limit: 2g   # disable swap to make OOM kills deterministic
+    # A 768 MiB cgroup limit lets the 700 MiB worker cap cross the 85% RAM
+    # diagnosis threshold while preserving headroom for nginx and supervisord.
+    mem_limit: 768m
+    memswap_limit: 768m   # disable swap to make OOM kills deterministic
     ports:
       # nginx on container port 80 → host port 8080
       # Change the host port if 8080 is occupied on your machine

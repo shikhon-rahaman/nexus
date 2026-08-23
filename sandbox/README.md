@@ -93,8 +93,8 @@ bash sandbox/trigger_memory_fault.sh nexus-sandbox
 ### What happens
 
 1. The script finds the worker PID inside the container and sends `SIGUSR1`.
-2. worker.py activates fault mode: allocates ~1 MB/second, printing RSS to stdout.
-3. RSS climbs from ~5 MB toward the 1.5 GB cap. Logs print every second.
+2. worker.py activates fault mode: allocates ~20 MiB/second, printing RSS to stdout.
+3. RSS climbs from ~5 MB toward the 700 MiB cap. Logs print every second.
 
 ### Watch it live
 
@@ -193,7 +193,7 @@ docker inspect nexus-sandbox --format='{{.State.Health.Status}}'
 
 | Limit | Value | Reason |
 |-------|-------|--------|
-| Memory | 2 GB | Safely above 1.5 GB worker cap |
+| Memory | 768 MiB | Lets the 700 MiB worker cap cross the diagnosis threshold |
 | Swap | 0 (disabled) | Makes OOM kills deterministic |
 | nginx port | host 8080 → container 80 | Change in docker-compose.yml if 8080 is busy |
 

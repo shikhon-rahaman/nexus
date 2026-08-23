@@ -61,7 +61,82 @@ def _run(cmd: list[str]) -> str:
         return f"__CONTAINER_UNREACHABLE__: {exc}"
 
 
+def _cgroup_value(path: str) -> int | None:
+    raw = _run(["cat", path])
+    try:
+        return int(raw)
+    except ValueError:
+        return None
+
+
+def _cgroup_memory_metrics() -> tuple[str, dict] | None:
+    v2_current = _cgroup_value("/sys/fs/cgroup/memory.current")
+    v2_limit = _cgroup_value("/sys/fs/cgroup/memory.max")
+    v2_swap_current = _cgroup_value("/sys/fs/cgroup/memory.swap.current")
+    v2_swap_limit = _cgroup_value("/sys/fs/cgroup/memory.swap.max")
+    if v2_current is not None and v2_limit is not None and v2_limit > 0:
+        return (
+            "\n".join(
+                [
+                    "cgroup_version=2",
+                    f"memory.current={v2_current}",
+                    f"memory.max={v2_limit}",
+                    f"memory.swap.current={v2_swap_current or 0}",
+                    f"memory.swap.max={v2_swap_limit or 0}",
+                ]
+            ),
+            {
+                "ram_total_mb": int(v2_limit / (1024 ** 2)),
+                "ram_used_mb": int(v2_current / (1024 ** 2)),
+                "ram_pct": round(v2_current / v2_limit * 100, 1),
+                "swap_total_mb": int((v2_swap_limit or 0) / (1024 ** 2)),
+                "swap_used_mb": int((v2_swap_current or 0) / (1024 ** 2)),
+                "swap_pct": round(
+                    (v2_swap_current or 0) / v2_swap_limit * 100, 1
+                ) if v2_swap_limit else 0,
+            },
+        )
+
+    v1_current = _cgroup_value("/sys/fs/cgroup/memory/memory.usage_in_bytes")
+    v1_limit = _cgroup_value("/sys/fs/cgroup/memory/memory.limit_in_bytes")
+    v1_memsw_current = _cgroup_value("/sys/fs/cgroup/memory/memory.memsw.usage_in_bytes")
+    v1_memsw_limit = _cgroup_value("/sys/fs/cgroup/memory/memory.memsw.limit_in_bytes")
+    if v1_current is not None and v1_limit is not None and v1_limit > 0:
+        swap_current = max(0, (v1_memsw_current or v1_current) - v1_current)
+        swap_limit = max(0, (v1_memsw_limit or v1_limit) - v1_limit)
+        return (
+            "\n".join(
+                [
+                    "cgroup_version=1",
+                    f"memory.usage_in_bytes={v1_current}",
+                    f"memory.limit_in_bytes={v1_limit}",
+                    f"memory.memsw.usage_in_bytes={v1_memsw_current or v1_current}",
+                    f"memory.memsw.limit_in_bytes={v1_memsw_limit or v1_limit}",
+                ]
+            ),
+            {
+                "ram_total_mb": int(v1_limit / (1024 ** 2)),
+                "ram_used_mb": int(v1_current / (1024 ** 2)),
+                "ram_pct": round(v1_current / v1_limit * 100, 1),
+                "swap_total_mb": int(swap_limit / (1024 ** 2)),
+                "swap_used_mb": int(swap_current / (1024 ** 2)),
+                "swap_pct": round(swap_current / swap_limit * 100, 1) if swap_limit else 0,
+            },
+        )
+    return None
+
+
 def get_memory(**_ignored) -> Evidence:
+    cgroup_metrics = _cgroup_memory_metrics()
+    if cgroup_metrics is not None:
+        raw, metrics = cgroup_metrics
+        return Evidence(
+            tool_name="get_memory",
+            raw_output=raw,
+            parsed_metrics=metrics,
+            trust_level="system_verified",
+        )
+
     raw = _run(["free", "-m"])
     metrics = {}
     for line in raw.splitlines():
