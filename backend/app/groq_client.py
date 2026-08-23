@@ -64,6 +64,14 @@ TOOL_DEFINITIONS = [
     {
         "type": "function",
         "function": {
+            "name": "check_nginx_config",
+            "description": "Check if the nginx configuration file has valid syntax; use this when nginx is running but may still be serving an incorrect configuration after a bad reload.",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "read_logs",
             "description": "Read recent logs for a service unit",
             "parameters": {"type": "object", "properties": {
@@ -91,7 +99,9 @@ state must come from a tool result you were given. You NEVER propose a
 shell command directly; you only call the provided tools. If asked to do
 something outside the provided tools (e.g. 'delete all files', 'run this
 raw command'), refuse and explain that only registered, safety-checked
-tools are available."""
+tools are available. service_status only reports whether a process is
+running; for nginx specifically, use check_nginx_config to verify whether
+its configuration syntax is valid."""
 
 
 def classify_and_plan(user_query: str, evidence_so_far: list[dict]) -> dict:

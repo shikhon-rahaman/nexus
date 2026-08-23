@@ -194,6 +194,18 @@ def service_status(service_name: str, **_ignored) -> Evidence:
                      trust_level="system_verified")
 
 
+def check_nginx_config(**_ignored) -> Evidence:
+    raw = _run(["nginx", "-t"])
+    normalized_output = raw.lower()
+    config_valid = "syntax is ok" in normalized_output and "test failed" not in normalized_output
+    return Evidence(
+        tool_name="check_nginx_config",
+        raw_output=raw,
+        parsed_metrics={"config_valid": config_valid, "error": None if config_valid else raw},
+        trust_level="system_verified",
+    )
+
+
 def read_logs(unit: str, lines: int = 50, **_ignored) -> Evidence:
     log_files = _SUPERVISOR_LOG_FILES.get(unit)
     if log_files is None:
@@ -242,6 +254,7 @@ REGISTRY = {
     "get_disk": get_disk,
     "list_processes": list_processes,
     "service_status": service_status,
+    "check_nginx_config": check_nginx_config,
     "read_logs": read_logs,
     "list_ports": list_ports,
     "restart_service": restart_service,

@@ -22,6 +22,8 @@ def diagnose_from_evidence(evidence: list[Evidence]) -> Diagnosis:
     swap_pct = metrics.get("swap_pct")
     load = metrics.get("load_1min")
     top_processes = metrics.get("top_processes", [])
+    config_valid = metrics.get("config_valid")
+    config_error = metrics.get("error")
 
     if ram_pct is not None and ram_pct > 85:
         signals_triggered.append("high_ram")
@@ -34,6 +36,11 @@ def diagnose_from_evidence(evidence: list[Evidence]) -> Diagnosis:
     if load is not None and load > 4:
         signals_triggered.append("high_load")
         reasons.append(f"1-minute load average at {load}")
+
+    if config_valid is False:
+        signals_triggered.append("invalid_config")
+        error_summary = (config_error or "").splitlines()[0] if config_error else "configuration test failed"
+        reasons.append(f"nginx configuration is invalid: {error_summary}")
 
     top_consumer = None
     if top_processes:
@@ -58,10 +65,18 @@ def diagnose_from_evidence(evidence: list[Evidence]) -> Diagnosis:
     base = 0.5
     confidence = min(0.95, base + 0.15 * n_signals)
 
+    # A broken config is a definitive, binary fact (not a heuristic
+    # threshold), so it alone earns a higher floor confidence than a
+    # single soft numeric signal would.
+    if "invalid_config" in signals_triggered:
+        confidence = max(confidence, 0.7)
+
     if "high_ram" in signals_triggered and "high_swap" in signals_triggered:
         root_cause = "Memory pressure"
         if top_consumer:
             root_cause += f", primarily driven by {top_consumer['cmd']}"
+    elif "invalid_config" in signals_triggered:
+        root_cause = f"nginx configuration is invalid: {config_error.splitlines()[0] if config_error else 'test failed'}"
     elif "dominant_process" in signals_triggered:
         root_cause = f"A single process ({top_consumer['cmd']}) is consuming a disproportionate share of memory"
     elif "high_load" in signals_triggered:

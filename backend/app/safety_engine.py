@@ -26,6 +26,7 @@ TOOL_RISK: dict[str, str] = {
     "get_disk": "READ_ONLY",
     "list_processes": "READ_ONLY",
     "service_status": "READ_ONLY",
+    "check_nginx_config": "READ_ONLY",
     "read_logs": "READ_ONLY",
     "list_ports": "READ_ONLY",
     "search_files": "READ_ONLY",
