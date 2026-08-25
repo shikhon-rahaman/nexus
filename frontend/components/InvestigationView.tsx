@@ -23,20 +23,20 @@ import {
   ClipboardList,
   ShieldAlert,
 } from 'lucide-react';
-import { MOCK_INVESTIGATION_EVENTS } from '@/lib/mock-data';
+import { streamInvestigation, approveAction, denyAction } from '@/lib/api';
 
 // ── Stage icon + color map ────────────────────────────────────────────────────
 const STAGE_META = {
-  understanding:      { icon: Search,        color: 'text-blue-400',    label: 'Understanding' },
-  collecting:         { icon: Database,       color: 'text-cyan-400',    label: 'Collecting Evidence' },
-  diagnosing:         { icon: Microscope,     color: 'text-purple-400',  label: 'Analysing' },
-  root_cause:         { icon: Target,         color: 'text-nexus-cyan',  label: 'Root Cause Found' },
-  proposing_action:   { icon: Wrench,         color: 'text-amber-400',   label: 'Proposing Action' },
-  awaiting_approval:  { icon: ShieldCheck,    color: 'text-amber-400',   label: 'Awaiting Approval' },
-  executing:          { icon: Play,           color: 'text-emerald-400', label: 'Executing' },
-  verifying:          { icon: ClipboardList,  color: 'text-emerald-400', label: 'Verifying' },
-  complete:           { icon: CheckCircle2,   color: 'text-emerald-400', label: 'Complete' },
-  blocked:            { icon: ShieldAlert,    color: 'text-red-400',     label: 'Blocked' },
+  understanding: { icon: Search, color: 'text-blue-400', label: 'Understanding' },
+  collecting: { icon: Database, color: 'text-cyan-400', label: 'Collecting Evidence' },
+  diagnosing: { icon: Microscope, color: 'text-purple-400', label: 'Analysing' },
+  root_cause: { icon: Target, color: 'text-nexus-cyan', label: 'Root Cause Found' },
+  proposing_action: { icon: Wrench, color: 'text-amber-400', label: 'Proposing Action' },
+  awaiting_approval: { icon: ShieldCheck, color: 'text-amber-400', label: 'Awaiting Approval' },
+  executing: { icon: Play, color: 'text-emerald-400', label: 'Executing' },
+  verifying: { icon: ClipboardList, color: 'text-emerald-400', label: 'Verifying' },
+  complete: { icon: CheckCircle2, color: 'text-emerald-400', label: 'Complete' },
+  blocked: { icon: ShieldAlert, color: 'text-red-400', label: 'Blocked' },
 } as const;
 
 // ── Single timeline stage card ────────────────────────────────────────────────
@@ -64,8 +64,8 @@ function StageCard({
             event.stage === 'root_cause'
               ? 'border-cyan-600 bg-cyan-950'
               : event.stage === 'blocked'
-              ? 'border-red-800 bg-red-950'
-              : 'border-zinc-700 bg-nexus-surface-2',
+                ? 'border-red-800 bg-red-950'
+                : 'border-zinc-700 bg-nexus-surface-2',
           )}
         >
           <Icon className={cn('h-3 w-3', meta.color)} />
@@ -104,38 +104,6 @@ function StageCard({
       </div>
     </div>
   );
-}
-
-// ── Streaming simulation ──────────────────────────────────────────────────────
-function useStreamedEvents(events: InvestigationEvent[], trigger: boolean) {
-  const [visible, setVisible] = useState<InvestigationEvent[]>([]);
-  const [streaming, setStreaming] = useState(false);
-  const timeoutRefs = useRef<ReturnType<typeof setTimeout>[]>([]);
-
-  useEffect(() => {
-    if (!trigger) return;
-
-    // Clear previous
-    timeoutRefs.current.forEach(clearTimeout);
-    timeoutRefs.current = [];
-    setVisible([]);
-    setStreaming(true);
-
-    events.forEach((event, i) => {
-      const t = setTimeout(
-        () => {
-          setVisible((prev) => [...prev, event]);
-          if (i === events.length - 1) setStreaming(false);
-        },
-        800 + i * 1400,
-      );
-      timeoutRefs.current.push(t);
-    });
-
-    return () => timeoutRefs.current.forEach(clearTimeout);
-  }, [trigger, events]);
-
-  return { visible, streaming };
 }
 
 // ── Query input ───────────────────────────────────────────────────────────────
@@ -191,54 +159,95 @@ function QueryInput({
 
 // ── Example prompts ───────────────────────────────────────────────────────────
 const EXAMPLE_PROMPTS = [
-  'why is my system running out of memory?',
+  'why is my system slow?',
+  'nginx is not working, please diagnose and fix it',
   'why is nginx returning errors?',
-  'clean up old log files to free disk space',
 ];
 
-// ── Main InvestigationView ────────────────────────────────────────────────────
+// ── Main InvestigationView, wired to the real backend ─────────────────────────
 export function InvestigationView() {
   const [query, setQuery] = useState<string | null>(null);
-  const [trigger, setTrigger] = useState(false);
-  const [approved, setApproved] = useState(false);
-
-  const isSafetyScenario = query?.toLowerCase().includes('log') || query?.toLowerCase().includes('delete');
-
-  const events = isSafetyScenario
-    ? [
-        {
-          stage: 'understanding' as const,
-          timestamp: new Date().toISOString(),
-          label: 'Understanding request',
-          detail: 'Parsed intent: delete log files. Scope: /var/log/. Destructive action detected.',
-        },
-        {
-          stage: 'blocked' as const,
-          timestamp: new Date(Date.now() + 1200).toISOString(),
-          label: 'Safety Engine blocked action',
-          safety_block: {
-            reason:
-              'The proposed command attempts to delete files in /var/log/ matching a wildcard pattern. Bulk deletion of system log files is classified as destructive and irreversible under the active safety policy.',
-            policy_rule: 'POLICY-007: Wildcard file deletion in system directories is blocked.',
-            triggered_by: 'rm -rf /var/log/*.gz',
-          },
-        },
-      ]
-    : MOCK_INVESTIGATION_EVENTS;
-
-  const { visible, streaming } = useStreamedEvents(events, trigger);
+  const [visible, setVisible] = useState<InvestigationEvent[]>([]);
+  const [streaming, setStreaming] = useState(false);
+  const [actionId, setActionId] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const abortRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [visible]);
 
+  useEffect(() => {
+    // Abort any in-flight stream on unmount.
+    return () => abortRef.current?.();
+  }, []);
+
   const handleSubmit = (q: string) => {
+    abortRef.current?.();
     setQuery(q);
-    setApproved(false);
-    setTrigger(false);
-    // Small delay so state resets before new stream starts
-    setTimeout(() => setTrigger(true), 50);
+    setVisible([]);
+    setActionId(null);
+    setStreaming(true);
+
+    abortRef.current = streamInvestigation(
+      q,
+      (event) => {
+        setVisible((prev) => [...prev, event]);
+        if (event.stage === 'complete' || event.stage === 'blocked') {
+          setStreaming(false);
+        }
+      },
+      (id) => setActionId(id),
+    );
+  };
+
+  const handleApprove = async () => {
+    if (!actionId) return;
+    try {
+      const result = await approveAction(actionId);
+      setVisible((prev) => [
+        ...prev,
+        {
+          stage: 'verifying',
+          timestamp: new Date().toISOString(),
+          label: `Verification: ${result.status}`,
+          verification: result,
+        },
+      ]);
+    } catch (err) {
+      setVisible((prev) => [
+        ...prev,
+        {
+          stage: 'blocked',
+          timestamp: new Date().toISOString(),
+          label: 'Approval failed',
+          safety_block: {
+            reason: (err as Error).message,
+            policy_rule: 'n/a',
+            triggered_by: 'approval',
+          },
+        },
+      ]);
+    } finally {
+      setActionId(null);
+    }
+  };
+
+  const handleDeny = async () => {
+    if (!actionId) return;
+    try {
+      await denyAction(actionId);
+      setVisible((prev) => [
+        ...prev,
+        {
+          stage: 'complete',
+          timestamp: new Date().toISOString(),
+          label: 'Action denied by user',
+        },
+      ]);
+    } finally {
+      setActionId(null);
+    }
   };
 
   return (
@@ -285,16 +294,12 @@ export function InvestigationView() {
         )}
 
         {visible.map((event, i) => (
-          <div
-            key={`${event.stage}-${i}`}
-            style={{ animationDelay: `0ms` }}
-            className="animate-slide-in-up"
-          >
+          <div key={`${event.stage}-${i}`} className="animate-slide-in-up">
             <StageCard
               event={event}
               isLast={i === visible.length - 1 && !streaming}
-              onApprove={() => setApproved(true)}
-              onDeny={() => {}}
+              onApprove={handleApprove}
+              onDeny={handleDeny}
             />
           </div>
         ))}

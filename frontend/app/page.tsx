@@ -33,7 +33,7 @@ export default function Home() {
               <div className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_5px_oklch(0.72_0.19_145/0.8)]" />
               <span className="text-[10px] text-nexus-dim font-mono">nexus-sandbox</span>
             </div>
-            <span className="text-[10px] font-mono text-nexus-dim">
+            <span className="text-[10px] font-mono text-nexus-dim" suppressHydrationWarning>
               {new Date().toLocaleTimeString('en-GB', { hour12: false })}
             </span>
           </div>
